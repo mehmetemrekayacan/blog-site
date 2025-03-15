@@ -6,38 +6,70 @@ import {
   orderBy,
   where,
   doc,
-  deleteDoc
+  deleteDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
 
+// Yardımcı fonksiyon: Hata mesajlarını özelleştirme
+const getFriendlyErrorMessage = (error) => {
+  switch (error.code) {
+    case 'permission-denied':
+      return 'Bu işlem için yetkiniz yok.';
+    case 'not-found':
+      return 'Blog bulunamadı.';
+    case 'unavailable':
+      return 'Servis şu anda kullanılamıyor, lütfen daha sonra tekrar deneyin.';
+    default:
+      return error.message || 'Bir hata oluştu, lütfen tekrar deneyin.';
+  }
+};
+
+// Yeni blog oluşturma
 export const createBlog = async (blogData) => {
   try {
     const blogsRef = collection(db, 'blogs');
     const newBlog = await addDoc(blogsRef, {
       ...blogData,
-      createdAt: new Date().toISOString()
+      createdAt: serverTimestamp(), // Sunucu zaman damgası
+      updatedAt: serverTimestamp(), // Güncelleme zaman damgası
     });
     return newBlog.id;
   } catch (error) {
-    throw error;
+    throw new Error(getFriendlyErrorMessage(error));
   }
 };
 
-export const getBlogs = async () => {
+// Tüm blogları alma
+export const getBlogs = async ({ limit = 10, filterTags = null } = {}) => {
   try {
     const blogsRef = collection(db, 'blogs');
-    const q = query(blogsRef, orderBy('createdAt', 'desc'));
+    let q = query(blogsRef, orderBy('createdAt', 'desc'));
+
+    // Etiket filtresi (opsiyonel)
+    if (filterTags) {
+      q = query(blogsRef, where('tags', 'array-contains-any', filterTags), orderBy('createdAt', 'desc'));
+    }
+
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const blogs = querySnapshot.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data()
+      ...doc.data(),
     }));
+
+    // Limit uygulama (istemci tarafında, çünkü Firestore sorgusu limit olmadan çalıştı)
+    return blogs.slice(0, limit);
   } catch (error) {
-    throw error;
+    throw new Error(getFriendlyErrorMessage(error));
   }
 };
 
-export const getUserBlogs = async (userId) => {
+// Kullanıcıya özel blogları alma
+export const getUserBlogs = async (userId, { limit = 10 } = {}) => {
+  if (!userId) {
+    throw new Error('Kullanıcı ID’si gereklidir.');
+  }
+
   try {
     const blogsRef = collection(db, 'blogs');
     const q = query(
@@ -46,20 +78,28 @@ export const getUserBlogs = async (userId) => {
       orderBy('createdAt', 'desc')
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const blogs = querySnapshot.docs.map((doc) => ({
       id: doc.id,
-      ...doc.data()
+      ...doc.data(),
     }));
+
+    return blogs.slice(0, limit);
   } catch (error) {
-    throw error;
+    throw new Error(getFriendlyErrorMessage(error));
   }
 };
 
+// Blog silme
 export const deleteBlog = async (blogId) => {
+  if (!blogId) {
+    throw new Error('Blog ID’si gereklidir.');
+  }
+
   try {
     const blogRef = doc(db, 'blogs', blogId);
     await deleteDoc(blogRef);
+    return true; // Başarılı silme için geri dönüş
   } catch (error) {
-    throw error;
+    throw new Error(getFriendlyErrorMessage(error));
   }
-}; 
+};
