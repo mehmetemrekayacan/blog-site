@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { logoutUser } from '../services/auth';
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { logoutUser } from "../services/auth";
+import { toast } from "react-toastify";
 
 const Navbar = () => {
   const { currentUser } = useAuth();
@@ -12,14 +12,14 @@ const Navbar = () => {
   const handleLogout = async () => {
     try {
       await logoutUser();
-      toast.success('Başarıyla çıkış yapıldı!', {
-        position: 'top-right',
+      toast.success("Başarıyla çıkış yapıldı!", {
+        position: "top-right",
         autoClose: 3000,
       });
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
       toast.error(`Hata: ${error.message}`, {
-        position: 'top-right',
+        position: "top-right",
         autoClose: 3000,
       });
     }
@@ -41,13 +41,13 @@ const Navbar = () => {
           className="md:hidden text-2xl focus:outline-none"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
-          {isMenuOpen ? '✖' : '☰'}
+          {isMenuOpen ? "✖" : "☰"}
         </button>
 
         {/* Menü Öğeleri */}
         <div
           className={`${
-            isMenuOpen ? 'flex' : 'hidden'
+            isMenuOpen ? "flex" : "hidden"
           } md:flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 absolute md:static top-16 left-0 w-full md:w-auto bg-blue-600 md:bg-transparent p-4 md:p-0 transition-all duration-300`}
         >
           {currentUser ? (
