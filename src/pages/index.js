@@ -1,22 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { getBlogs } from '../services/blogService';
-import { auth } from '../services/firebase'; // Import auth
-import { onAuthStateChanged } from 'firebase/auth';
 import BlogCard from '../components/BlogCard';
 import { toast } from 'react-toastify';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { currentUser } = useAuth();
 
   useEffect(() => {
-    const fetchBlogs = async (user) => {
+    const fetchBlogs = async () => {
       try {
         setLoading(true);
-        if (!user) {
-          throw new Error('Lütfen giriş yapın.');
-        }
         const blogList = await getBlogs();
         setBlogs(blogList || []);
         setError(null);
@@ -32,13 +29,7 @@ const Home = () => {
       }
     };
 
-    // Listen to auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      fetchBlogs(user);
-    });
-
-    // Cleanup subscription
-    return () => unsubscribe();
+    fetchBlogs();
   }, []);
 
   return (
@@ -76,12 +67,17 @@ const Home = () => {
             {blogs.map((blog) => (
               <BlogCard
                 key={blog.id}
+                id={blog.id}
                 title={blog.title}
                 content={blog.content}
                 author={blog.author}
                 date={blog.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}
                 imageUrl={blog.imageUrl}
                 tags={blog.tags || []}
+                userId={blog.userId}
+                currentUser={currentUser}
+                likeCount={blog.likeCount || 0}
+                likedBy={blog.likedBy || []}
               />
             ))}
           </div>

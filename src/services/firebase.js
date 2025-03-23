@@ -11,7 +11,7 @@ const firebaseConfig = {
   storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.REACT_APP_FIREBASE_APP_ID,
-  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID, // Ölçüm ID’sini düzelttim
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // Çevresel değişkenlerin varlığını kontrol et
@@ -21,7 +21,7 @@ const requiredEnvVars = [
   'REACT_APP_FIREBASE_PROJECT_ID',
   'REACT_APP_FIREBASE_STORAGE_BUCKET',
   'REACT_APP_FIREBASE_MESSAGING_SENDER_ID',
-  'REACT_APP_FIREBASE_APP_ID',
+  'REACT_APP_FIREBASE_APP_ID'
 ];
 
 const missingEnvVars = requiredEnvVars.filter((key) => !process.env[key]);
@@ -32,13 +32,7 @@ if (missingEnvVars.length > 0) {
 }
 
 // Firebase uygulamasını başlat
-let app;
-try {
-  app = initializeApp(firebaseConfig);
-} catch (error) {
-  console.error('Firebase başlatma hatası:', error);
-  throw new Error('Firebase uygulaması başlatılamadı. Yapılandırmayı kontrol edin.');
-}
+const app = initializeApp(firebaseConfig);
 
 // Firebase servislerini dışa aktar
 export const auth = getAuth(app);

@@ -3,12 +3,14 @@ import { AuthProvider } from "./context/AuthContext";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// Pagess
+// Pages
 import Home from "./pages";
 import Login from "./pages/login";
 import Register from "./pages/register";
 import Profile from "./pages/profile";
 import Share from "./pages/share";
+import Edit from "./pages/edit";
+import BlogDetail from "./pages/blog/[id]";
 
 // Components
 import Navbar from "./components/Navbar";
@@ -25,6 +27,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/blog/:id" element={<BlogDetail />} />
               <Route
                 path="/profile"
                 element={
@@ -38,6 +41,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Share />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/edit/:id"
+                element={
+                  <ProtectedRoute>
+                    <Edit />
                   </ProtectedRoute>
                 }
               />

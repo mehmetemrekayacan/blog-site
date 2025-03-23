@@ -7,7 +7,10 @@ import {
   where,
   doc,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDoc,
+  updateDoc,
+  increment
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -33,8 +36,48 @@ export const createBlog = async (blogData) => {
       ...blogData,
       createdAt: serverTimestamp(), // Sunucu zaman damgası
       updatedAt: serverTimestamp(), // Güncelleme zaman damgası
+      likeCount: 0, // Beğeni sayısı başlangıçta 0
+      likedBy: [] // Beğenen kullanıcıların ID'leri
     });
     return newBlog.id;
+  } catch (error) {
+    throw new Error(getFriendlyErrorMessage(error));
+  }
+};
+
+// Blog beğenme/beğeniyi geri çekme
+export const toggleLike = async (blogId, userId) => {
+  if (!blogId || !userId) {
+    throw new Error("Blog ID'si ve kullanıcı ID'si gereklidir.");
+  }
+
+  try {
+    const blogRef = doc(db, 'blogs', blogId);
+    const blogDoc = await getDoc(blogRef);
+
+    if (!blogDoc.exists()) {
+      throw new Error('Blog bulunamadı.');
+    }
+
+    const blogData = blogDoc.data();
+    const likedBy = blogData.likedBy || [];
+    const isLiked = likedBy.includes(userId);
+
+    if (isLiked) {
+      // Beğeniyi geri çek
+      await updateDoc(blogRef, {
+        likeCount: increment(-1),
+        likedBy: likedBy.filter(id => id !== userId)
+      });
+    } else {
+      // Beğeni ekle
+      await updateDoc(blogRef, {
+        likeCount: increment(1),
+        likedBy: [...likedBy, userId]
+      });
+    }
+
+    return !isLiked; // Yeni beğeni durumunu döndür
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
   }
@@ -67,7 +110,7 @@ export const getBlogs = async ({ limit = 10, filterTags = null } = {}) => {
 // Kullanıcıya özel blogları alma
 export const getUserBlogs = async (userId, { limit = 10 } = {}) => {
   if (!userId) {
-    throw new Error('Kullanıcı ID’si gereklidir.');
+    throw new Error("Kullanıcı ID'si gereklidir.");
   }
 
   try {
@@ -92,13 +135,61 @@ export const getUserBlogs = async (userId, { limit = 10 } = {}) => {
 // Blog silme
 export const deleteBlog = async (blogId) => {
   if (!blogId) {
-    throw new Error('Blog ID’si gereklidir.');
+    throw new Error("Blog ID'si gereklidir.");
   }
 
   try {
     const blogRef = doc(db, 'blogs', blogId);
     await deleteDoc(blogRef);
     return true; // Başarılı silme için geri dönüş
+  } catch (error) {
+    throw new Error(getFriendlyErrorMessage(error));
+  }
+};
+
+// Blog güncelleme
+export const updateBlog = async (blogId, blogData) => {
+  if (!blogId) {
+    throw new Error("Blog ID'si gereklidir.");
+  }
+
+  try {
+    const blogRef = doc(db, 'blogs', blogId);
+    const blogDoc = await getDoc(blogRef);
+
+    if (!blogDoc.exists()) {
+      throw new Error('Blog bulunamadı.');
+    }
+
+    await updateDoc(blogRef, {
+      ...blogData,
+      updatedAt: serverTimestamp(),
+    });
+
+    return true;
+  } catch (error) {
+    throw new Error(getFriendlyErrorMessage(error));
+  }
+};
+
+// Tek bir blog getirme
+export const getBlogById = async (blogId) => {
+  if (!blogId) {
+    throw new Error("Blog ID'si gereklidir.");
+  }
+
+  try {
+    const blogRef = doc(db, 'blogs', blogId);
+    const blogDoc = await getDoc(blogRef);
+
+    if (!blogDoc.exists()) {
+      throw new Error('Blog bulunamadı.');
+    }
+
+    return {
+      id: blogDoc.id,
+      ...blogDoc.data(),
+    };
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
   }
