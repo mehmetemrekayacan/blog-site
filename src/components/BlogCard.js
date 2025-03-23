@@ -47,6 +47,7 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
 
   const handleDelete = async (e) => {
     e.stopPropagation(); // Tıklama olayının üst elemana yayılmasını engelle
+    setShowDeleteModal(false); // Modal'ı kapat
     try {
       await deleteBlog(id);
       toast.success('Blog başarıyla silindi!', {
@@ -125,7 +126,10 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
                   Düzenle
                 </button>
                 <button
-                  onClick={() => setShowDeleteModal(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteModal(true);
+                  }}
                   className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
                 >
                   <svg
@@ -231,8 +235,8 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
               </button>
               <button
                 onClick={(e) => {
+                  e.stopPropagation();
                   handleDelete(e);
-                  setShowDeleteModal(false);
                 }}
                 className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
               >

@@ -1,39 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { getBlogById, toggleLike } from '../../services/blogService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getBlogById, toggleLike, deleteBlog } from '../../services/blogService';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
 
 const BlogDetail = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
+  const [isLiked, setIsLiked] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const fetchBlog = async () => {
       try {
-        setLoading(true);
         const blogData = await getBlogById(id);
         setBlog(blogData);
-        setError(null);
+        setIsLiked(blogData.likedBy?.includes(currentUser?.uid) || false);
+        setLoading(false);
       } catch (error) {
-        console.error('Blog yüklenirken hata oluştu:', error);
-        setError(error.message || 'Blog yüklenemedi.');
-        toast.error('Blog yüklenirken bir hata oluştu!', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-      } finally {
+        setError(error.message);
         setLoading(false);
       }
     };
 
     fetchBlog();
-  }, [id]);
+  }, [id, currentUser?.uid]);
 
   const handleLike = async () => {
     if (!currentUser) {
@@ -47,9 +42,9 @@ const BlogDetail = () => {
 
     try {
       const newLikeState = await toggleLike(id, currentUser.uid);
+      setIsLiked(newLikeState);
       setBlog(prev => ({
         ...prev,
-        isLiked: newLikeState,
         likeCount: newLikeState ? prev.likeCount + 1 : prev.likeCount - 1
       }));
     } catch (error) {
@@ -60,45 +55,53 @@ const BlogDetail = () => {
     }
   };
 
+  const handleDelete = async () => {
+    try {
+      await deleteBlog(id);
+      toast.success('Blog başarıyla silindi!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      navigate('/');
+    } catch (error) {
+      toast.error(`Hata: ${error.message}`, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    }
+  };
+
+  const handleEdit = () => {
+    navigate(`/edit/${id}`);
+  };
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="relative w-16 h-16">
-          <div className="absolute inset-0 border-4 border-t-4 border-blue-500 border-t-indigo-600 rounded-full animate-spin"></div>
-          <span className="absolute inset-0 flex items-center justify-center text-sm text-gray-600 animate-pulse">
-            Yükleniyor...
-          </span>
-        </div>
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Hata!</strong>
-          <span className="block sm:inline"> {error}</span>
-        </div>
+      <div className="text-center text-red-600 p-4">
+        <p>{error}</p>
       </div>
     );
   }
 
   if (!blog) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Uyarı!</strong>
-          <span className="block sm:inline"> Blog bulunamadı.</span>
-        </div>
+      <div className="text-center p-4">
+        <p>Blog bulunamadı.</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <article className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-        {/* Blog Görseli */}
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         {blog.imageUrl && (
           <img
             src={blog.imageUrl}
@@ -106,70 +109,99 @@ const BlogDetail = () => {
             className="w-full h-96 object-cover"
           />
         )}
+        
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-3xl font-bold text-gray-900">{blog.title}</h1>
+            {currentUser && currentUser.uid === blog.userId && (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEdit}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  Düzenle
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                >
+                  Sil
+                </button>
+              </div>
+            )}
+          </div>
 
-        <div className="p-8">
-          {/* Başlık */}
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            {blog.title}
-          </h1>
-
-          {/* Yazar ve Tarih */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center">
-              <span className="text-gray-600 font-medium">
-                Yazar: <span className="text-indigo-600">{blog.author}</span>
-              </span>
-            </div>
-            <span className="text-gray-500">
-              {blog.createdAt?.toDate().toLocaleDateString('tr-TR')}
+          <div className="flex items-center text-gray-600 mb-4">
+            <span className="mr-4">Yazar: {blog.author}</span>
+            <span>
+              {blog.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}
             </span>
           </div>
 
-          {/* Etiketler */}
-          {blog.tags && blog.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              {blog.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* İçerik */}
-          <div className="prose prose-lg max-w-none mb-8">
-            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {blog.content}
-            </p>
+          <div className="flex flex-wrap gap-2 mb-6">
+            {blog.tags?.map((tag, index) => (
+              <span
+                key={index}
+                className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+              >
+                {tag}
+              </span>
+            ))}
           </div>
 
-          {/* Beğeni Butonu */}
-          <div className="flex items-center justify-between border-t pt-6">
-            <button
-              onClick={handleLike}
-              className={`flex items-center gap-2 text-lg font-medium transition-colors duration-200 ${
-                blog.isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-400'
-              }`}
+          <div className="prose max-w-none mb-6">
+            <p className="text-gray-700 whitespace-pre-wrap">{blog.content}</p>
+          </div>
+
+          <button
+            onClick={handleLike}
+            className={`flex items-center gap-2 text-lg ${
+              isLiked ? 'text-red-500' : 'text-gray-500'
+            }`}
+          >
+            <svg
+              className={`w-6 h-6 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}`}
+              viewBox="0 0 24 24"
+              strokeWidth="2"
             >
-              <svg
-                className={`w-6 h-6 ${blog.isLiked ? 'fill-current' : 'fill-none stroke-current'}`}
-                viewBox="0 0 24 24"
-                strokeWidth="2"
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+            <span>{blog.likeCount || 0} {isLiked ? 'Beğenildi' : 'Beğen'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Silme Onay Modalı */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Blogu Silmeyi Onayla
+            </h3>
+            <p className="text-gray-600 mb-6">
+              "{blog.title}" başlıklı blogu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                />
-              </svg>
-              <span>{blog.likeCount || 0} {blog.isLiked ? 'Beğenildi' : 'Beğen'}</span>
-            </button>
+                İptal
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+              >
+                Sil
+              </button>
+            </div>
           </div>
         </div>
-      </article>
+      )}
     </div>
   );
 };
