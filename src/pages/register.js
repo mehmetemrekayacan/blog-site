@@ -15,7 +15,7 @@ const Register = () => {
     setLoading(true);
     try {
       await registerUser(email, password, displayName);
-      toast.success('Kayıt başarılı! Lütfen e-postanızı doğrulayın.', {
+      toast.success('Kayıt başarılı! Lütfen e-postanızı doğrulayın ve giriş yapın.', {
         position: 'top-right',
         autoClose: 5000,
       });

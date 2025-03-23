@@ -2,12 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { deleteCurrentUser } from '../services/auth';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
-import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
 const Profile = () => {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -15,14 +12,16 @@ const Profile = () => {
   const handleReauthenticateAndDelete = async () => {
     setLoading(true);
     try {
-      const credential = EmailAuthProvider.credential(currentUser.email, password);
-      await reauthenticateWithCredential(currentUser, credential);
-      await deleteCurrentUser();
+      // Hesabı sil
+      await deleteCurrentUser(password);
+      
       toast.success('Hesabınız başarıyla silindi!', {
         position: 'top-right',
         autoClose: 3000,
       });
-      navigate('/register', { replace: true });
+      
+      // Kullanıcı silindikten sonra sayfayı yenile ve ana sayfaya yönlendir
+      window.location.href = '/';
     } catch (error) {
       toast.error(`Hata: ${error.message}`, {
         position: 'top-right',

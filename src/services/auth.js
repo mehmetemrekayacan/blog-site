@@ -4,7 +4,9 @@ import {
   signOut,
   sendEmailVerification,
   updateProfile,
-  deleteUser
+  deleteUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from 'firebase/auth';
 import { auth } from './firebase';
 
@@ -39,10 +41,10 @@ export const registerUser = async (email, password, displayName) => {
     await updateProfile(user, { displayName });
 
     // E-posta doğrulama gönder
-    await sendEmailVerification(user, {
-      url: `${window.location.origin}/login`, // Doğrulama sonrası yönlendirme URL’si
-      handleCodeInApp: true,
-    });
+    await sendEmailVerification(user);
+
+    // Kayıt sonrası otomatik giriş yapılmasını engellemek için çıkış yap
+    await signOut(auth);
 
     return user;
   } catch (error) {
@@ -58,7 +60,7 @@ export const loginUser = async (email, password) => {
 
     if (!user.emailVerified) {
       await signOut(auth); // Doğrulanmamışsa çıkış yap
-      throw new Error('Lütfen e-posta adresinizi doğrulayın.');
+      throw new Error('Lütfen e-posta adresinizi doğrulayın. Gelen kutunuzu kontrol edin.');
     }
 
     return user;
@@ -77,16 +79,24 @@ export const logoutUser = async () => {
 };
 
 // Mevcut kullanıcıyı silme
-export const deleteCurrentUser = async () => {
+export const deleteCurrentUser = async (password) => {
   const user = auth.currentUser;
   if (!user) {
     throw new Error('Şu anda oturum açmış bir kullanıcı yok.');
   }
 
   try {
+    // Önce kimlik doğrulama yap
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+    
+    // Sonra kullanıcıyı sil
     await deleteUser(user);
-    return true; // Başarılı silme için geri dönüş
+    return true;
   } catch (error) {
+    if (error.code === 'auth/requires-recent-login') {
+      throw new Error('Hesabı silmek için tekrar giriş yapmanız gerekiyor. Lütfen tekrar giriş yapıp deneyin.');
+    }
     throw new Error(getFriendlyErrorMessage(error));
   }
 };
