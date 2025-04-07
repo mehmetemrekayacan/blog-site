@@ -100,3 +100,18 @@ export const deleteCurrentUser = async (password) => {
     throw new Error(getFriendlyErrorMessage(error));
   }
 };
+
+// Kullanıcı profilini güncelleme
+export const updateUserProfile = async (displayName, photoURL) => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Şu anda oturum açmış bir kullanıcı yok.');
+  }
+
+  try {
+    await updateProfile(user, { displayName, photoURL });
+    return user;
+  } catch (error) {
+    throw new Error(getFriendlyErrorMessage(error));
+  }
+};

@@ -4,7 +4,7 @@ import { deleteBlog, toggleLike } from '../services/blogService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
-const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userId, currentUser, likeCount = 0, likedBy = [] }) => {
+const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userId, currentUser, likeCount = 0, likedBy = [], authorPhotoURL }) => {
   const [isLiked, setIsLiked] = useState(likedBy.includes(currentUser?.uid));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -171,9 +171,16 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
 
         {/* Yazar ve Tarih */}
         <div className="flex justify-between items-center mb-3">
-          <p className="text-gray-500 text-sm font-medium">
-            Yazar: <span className="text-indigo-500">{author}</span>
-          </p>
+          <div className="flex items-center gap-2">
+            <img
+              src={authorPhotoURL || `https://ui-avatars.com/api/?name=${author}&background=random`}
+              alt={author}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+            <p className="text-gray-500 text-sm font-medium">
+              Yazar: <span className="text-indigo-500">{author}</span>
+            </p>
+          </div>
           <p className="text-gray-400 text-xs">{date}</p>
         </div>
 
@@ -262,7 +269,8 @@ BlogCard.propTypes = {
   userId: PropTypes.string.isRequired,
   currentUser: PropTypes.object,
   likeCount: PropTypes.number,
-  likedBy: PropTypes.arrayOf(PropTypes.string)
+  likedBy: PropTypes.arrayOf(PropTypes.string),
+  authorPhotoURL: PropTypes.string
 };
 
 export default BlogCard;

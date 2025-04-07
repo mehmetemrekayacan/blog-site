@@ -1,26 +1,112 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { deleteCurrentUser } from '../services/auth';
+import { deleteCurrentUser, updateUserProfile } from '../services/auth';
 import { toast } from 'react-toastify';
+import { storage } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const Profile = () => {
   const { currentUser } = useAuth();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleUpdateProfile = async () => {
+    setLoading(true);
+    try {
+      await updateUserProfile(displayName, currentUser.photoURL);
+      setIsEditingName(false);
+      toast.success('Profil başarıyla güncellendi!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } catch (error) {
+      toast.error(`Hata: ${error.message}`, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Dosya boyutu kontrolü (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Dosya boyutu 5MB\'dan küçük olmalıdır.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Dosya tipi kontrolü
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen geçerli bir resim dosyası seçin.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      // Benzersiz dosya adı oluştur
+      const timestamp = Date.now();
+      const uniqueFileName = `${currentUser.uid}_${timestamp}_${file.name}`;
+      
+      const storageRef = ref(storage, `profile-photos/${uniqueFileName}`);
+      
+      // Metadata ekle
+      const metadata = {
+        contentType: file.type,
+        customMetadata: {
+          'userId': currentUser.uid,
+          'uploadedAt': timestamp.toString()
+        }
+      };
+      
+      // Dosyayı yükle
+      await uploadBytes(storageRef, file, metadata);
+      
+      // Yüklenen dosyanın URL'sini al
+      const photoURL = await getDownloadURL(storageRef);
+      
+      // Kullanıcı profilini güncelle
+      await updateUserProfile(currentUser.displayName, photoURL);
+      
+      toast.success('Profil fotoğrafı başarıyla güncellendi!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error('Fotoğraf yükleme hatası:', error);
+      toast.error(`Hata: ${error.message}`, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      setUploadingPhoto(false);
+      // Input'u temizle
+      event.target.value = '';
+    }
+  };
 
   const handleReauthenticateAndDelete = async () => {
     setLoading(true);
     try {
-      // Hesabı sil
       await deleteCurrentUser(password);
-      
       toast.success('Hesabınız başarıyla silindi!', {
         position: 'top-right',
         autoClose: 3000,
       });
-      
-      // Kullanıcı silindikten sonra sayfayı yenile ve ana sayfaya yönlendir
       window.location.href = '/';
     } catch (error) {
       toast.error(`Hata: ${error.message}`, {
@@ -30,7 +116,7 @@ const Profile = () => {
     } finally {
       setLoading(false);
       setShowDeleteModal(false);
-      setPassword(''); // Şifreyi sıfırla
+      setPassword('');
     }
   };
 
@@ -50,18 +136,129 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto bg-white p-6 rounded-xl shadow-lg">
-        {/* Başlık */}
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
           Profil
         </h1>
+
+        {/* Profil Fotoğrafı */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="relative">
+            <img
+              src={currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.displayName}&background=random`}
+              alt="Profil"
+              className="w-32 h-32 rounded-full object-cover border-4 border-indigo-500"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="absolute bottom-0 right-0 bg-indigo-500 text-white p-2 rounded-full hover:bg-indigo-600 transition-colors"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handlePhotoUpload}
+              accept="image/*"
+              className="hidden"
+            />
+          </div>
+          {uploadingPhoto && (
+            <p className="mt-2 text-sm text-gray-500">Fotoğraf yükleniyor...</p>
+          )}
+        </div>
 
         {/* Kullanıcı Bilgileri */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <span className="text-gray-700 font-medium">Kullanıcı Adı:</span>
-            <span className="text-gray-900">
-              {currentUser.displayName || 'Belirtilmemiş'}
-            </span>
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="px-2 py-1 border rounded"
+                />
+                <button
+                  onClick={handleUpdateProfile}
+                  disabled={loading}
+                  className="text-green-500 hover:text-green-600"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setIsEditingName(false)}
+                  className="text-red-500 hover:text-red-600"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-gray-900">{currentUser.displayName || 'Belirtilmemiş'}</span>
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="text-indigo-500 hover:text-indigo-600"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <span className="text-gray-700 font-medium">E-posta:</span>
@@ -88,7 +285,7 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Hesap Silme Modal */}
+      {/* Silme Onay Modalı */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createBlog } from '../services/blogService';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { storage } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const Share = () => {
   const [title, setTitle] = useState('');
@@ -10,8 +12,37 @@ const Share = () => {
   const [tags, setTags] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const storageRef = ref(storage, `blog-images/${Date.now()}-${file.name}`);
+      await uploadBytes(storageRef, file);
+      const imageUrl = await getDownloadURL(storageRef);
+      
+      // Görsel URL'sini state'e ekle
+      setImageUrl(imageUrl);
+      
+      toast.success('Görsel başarıyla yüklendi!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } catch (error) {
+      toast.error(`Hata: ${error.message}`, {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,8 +52,9 @@ const Share = () => {
         title,
         content,
         userId: currentUser.uid,
-        author: currentUser.displayName || currentUser.email.split('@')[0], // Varsayılan yazar adı
-        tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean), // Etiketleri diziye çevir
+        author: currentUser.displayName || currentUser.email.split('@')[0],
+        authorPhotoURL: currentUser.photoURL,
+        tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
         imageUrl: imageUrl || null,
         createdAt: new Date().toISOString(),
       };
@@ -35,7 +67,7 @@ const Share = () => {
       setContent('');
       setTags('');
       setImageUrl('');
-      navigate('/'); // Ana sayfaya yönlendir
+      navigate('/');
     } catch (error) {
       toast.error(`Hata: ${error.message}`, {
         position: 'top-right',
@@ -109,20 +141,56 @@ const Share = () => {
             />
           </div>
 
-          {/* Görsel URL */}
+          {/* Görsel */}
           <div>
-            <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700">
-              Görsel URL (isteğe bağlı)
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Blog Görseli
             </label>
-            <input
-              id="imageUrl"
-              type="url"
-              placeholder="Blog için bir görsel URL’si ekleyin"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              disabled={loading}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-200"
-            />
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading || uploadingImage}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                {uploadingImage ? 'Yükleniyor...' : 'Görsel Seç'}
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                className="hidden"
+              />
+            </div>
+            {imageUrl && (
+              <div className="mt-4">
+                <img
+                  src={imageUrl}
+                  alt="Blog görseli"
+                  className="max-h-48 rounded-lg object-cover"
+                />
+              </div>
+            )}
           </div>
 
           {/* Paylaş Butonu */}
