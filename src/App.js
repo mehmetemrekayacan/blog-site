@@ -12,6 +12,8 @@ import Profile from "./pages/profile";
 import Share from "./pages/share";
 import Edit from "./pages/edit";
 import BlogDetail from "./pages/blog/[id]";
+import { AdminPanel } from "./pages/Admin";
+import Unauthorized from "./pages/Unauthorized";
 
 // Components
 import Navbar from "./components/Navbar";
@@ -30,6 +32,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/blog/:id" element={<BlogDetail />} />
+                <Route path="/unauthorized" element={<Unauthorized />} />
                 <Route
                   path="/profile"
                   element={
@@ -51,6 +54,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <Edit />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <AdminPanel />
                     </ProtectedRoute>
                   }
                 />

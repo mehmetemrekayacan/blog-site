@@ -1,13 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { logoutUser } from "../services/auth";
+import { logoutUser, isAdmin } from "../services/auth";
 import { toast } from "react-toastify";
 
 const Navbar = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (currentUser) {
+        const adminStatus = await isAdmin(currentUser);
+        setIsUserAdmin(adminStatus);
+      }
+    };
+    checkAdminStatus();
+  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -90,6 +101,27 @@ const Navbar = () => {
                 </svg>
                 Paylaş
               </Link>
+              {isUserAdmin && (
+                <Link
+                  to="/admin"
+                  className="flex items-center gap-2 hover:text-indigo-200 transition-colors duration-200"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M15 10a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  Admin Paneli
+                </Link>
+              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all duration-200"

@@ -19,14 +19,36 @@ const Login = () => {
         position: 'top-right',
         autoClose: 3000,
       });
-      // Kullanıcıyı geldiği sayfaya veya ana sayfaya yönlendir
       const redirectTo = location.state?.from?.pathname || '/';
       navigate(redirectTo, { replace: true });
     } catch (error) {
-      toast.error(`Hata: ${error.message}`, {
-        position: 'top-right',
-        autoClose: 3000,
-      });
+      console.log('Gelen hata:', error);
+      if (
+        (error.code && (error.code === 'user-not-found' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) ||
+        (error.message && error.message.toLowerCase().includes('kullanıcı bulunamadı')) ||
+        (error.message && error.message.toLowerCase().includes('user-not-found')) ||
+        (error.message && error.message.toLowerCase().includes('invalid-credential'))
+      ) {
+        toast.info('Böyle bir hesap bulunamadı, lütfen kayıt olun.', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        navigate('/register', { replace: true });
+      } else if (
+        (error.code && (error.code === 'wrong-password' || error.code === 'auth/wrong-password')) ||
+        (error.message && error.message.toLowerCase().includes('wrong password')) ||
+        (error.message && error.message.toLowerCase().includes('şifre') && error.message.toLowerCase().includes('yanlış'))
+      ) {
+        toast.error('Şifreniz yanlış, lütfen şifrenizi doğru girin.', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      } else {
+        toast.error(`Hata: ${error.message}`, {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      }
     } finally {
       setLoading(false);
     }
