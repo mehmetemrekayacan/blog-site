@@ -78,6 +78,7 @@ const Home = () => {
                 currentUser={currentUser}
                 likeCount={blog.likeCount || 0}
                 likedBy={blog.likedBy || []}
+                authorPhotoURL={blog.authorPhotoURL}
               />
             ))}
           </div>

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBlogById, toggleLike, deleteBlog } from '../../services/blogService';
+import { createComment, getBlogComments } from '../../services/commentService';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
+import Comment from '../../components/Comment';
 
 const BlogDetail = () => {
   const { id } = useParams();
@@ -13,6 +15,9 @@ const BlogDetail = () => {
   const [error, setError] = useState(null);
   const [isLiked, setIsLiked] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComments, setLoadingComments] = useState(true);
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -27,7 +32,19 @@ const BlogDetail = () => {
       }
     };
 
+    const fetchComments = async () => {
+      try {
+        const commentsData = await getBlogComments(id);
+        setComments(commentsData);
+      } catch (error) {
+        toast.error('Yorumlar yüklenirken bir hata oluştu.');
+      } finally {
+        setLoadingComments(false);
+      }
+    };
+
     fetchBlog();
+    fetchComments();
   }, [id, currentUser?.uid]);
 
   const handleLike = async () => {
@@ -73,6 +90,40 @@ const BlogDetail = () => {
 
   const handleEdit = () => {
     navigate(`/edit/${id}`);
+  };
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      toast.info('Yorum yapabilmek için giriş yapmalısınız.');
+      navigate('/login');
+      return;
+    }
+
+    if (!newComment.trim()) return;
+
+    try {
+      const commentData = {
+        blogId: id,
+        content: newComment,
+        userId: currentUser.uid,
+        author: currentUser.displayName || currentUser.email.split('@')[0],
+        authorPhotoURL: currentUser.photoURL
+      };
+
+      const newCommentData = await createComment(commentData);
+      setComments(prevComments => [newCommentData, ...prevComments]);
+      setNewComment('');
+      toast.success('Yorumunuz başarıyla eklendi!');
+    } catch (error) {
+      console.error('Yorum ekleme hatası:', error);
+      toast.error('Yorum eklenirken bir hata oluştu.');
+    }
+  };
+
+  const handleCommentDelete = async (commentId) => {
+    const updatedComments = comments.filter(comment => comment.id !== commentId);
+    setComments(updatedComments);
   };
 
   if (loading) {
@@ -132,6 +183,11 @@ const BlogDetail = () => {
           </div>
 
           <div className="flex items-center text-gray-600 mb-4">
+            <img
+              src={blog.authorPhotoURL || `https://ui-avatars.com/api/?name=${blog.author}&background=random`}
+              alt={blog.author}
+              className="w-8 h-8 rounded-full object-cover mr-2"
+            />
             <span className="mr-4">Yazar: {blog.author}</span>
             <span>
               {blog.createdAt?.toDate().toLocaleDateString() || new Date().toLocaleDateString()}
@@ -172,6 +228,57 @@ const BlogDetail = () => {
             </svg>
             <span>{blog.likeCount || 0} {isLiked ? 'Beğenildi' : 'Beğen'}</span>
           </button>
+        </div>
+
+        {/* Yorumlar Bölümü */}
+        <div className="p-6 border-t">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Yorumlar</h2>
+
+          {/* Yorum Formu */}
+          <form onSubmit={handleCommentSubmit} className="mb-8">
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Yorumunuzu yazın..."
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows="3"
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                type="submit"
+                disabled={!newComment.trim()}
+                className={`px-4 py-2 rounded-md text-white ${
+                  !newComment.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                Yorum Yap
+              </button>
+            </div>
+          </form>
+
+          {/* Yorumları Listele */}
+          {loadingComments ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+            </div>
+          ) : comments.length > 0 ? (
+            <div className="space-y-6">
+              {comments.map((comment) => (
+                <Comment
+                  key={comment.id}
+                  comment={comment}
+                  currentUser={currentUser}
+                  onDelete={handleCommentDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-gray-500">
+              Henüz yorum yapılmamış. İlk yorumu sen yap!
+            </p>
+          )}
         </div>
       </div>
 
