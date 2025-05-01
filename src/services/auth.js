@@ -6,11 +6,15 @@ import {
   updateProfile,
   deleteUser,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  getAuth,
+  updateEmail,
+  updatePassword
 } from 'firebase/auth';
 import { auth } from './firebase';
 import { getDoc, doc, getDocs, collection, deleteDoc, setDoc, serverTimestamp, updateDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
+import { toast } from 'react-toastify';
 
 // Yardımcı fonksiyon: Hata mesajlarını özelleştirme
 const getFriendlyErrorMessage = (error) => {
@@ -282,5 +286,57 @@ export const deleteUserByAdmin = async (userId) => {
     return true;
   } catch (error) {
     throw new Error('Kullanıcı ve içerikleri silinirken bir hata oluştu: ' + error.message);
+  }
+};
+
+export const updateUserEmail = async (newEmail, currentPassword) => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error('Kullanıcı girişi yapılmamış');
+  }
+
+  try {
+    // Kullanıcıyı yeniden doğrula
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // E-posta adresini güncelle
+    await updateEmail(user, newEmail);
+
+    // Firestore'daki kullanıcı bilgilerini güncelle
+    const userDoc = doc(db, 'users', user.uid);
+    await updateDoc(userDoc, {
+      email: newEmail
+    });
+
+    return true;
+  } catch (error) {
+    console.error('E-posta güncelleme hatası:', error);
+    throw error;
+  }
+};
+
+export const updateUserPassword = async (newPassword, currentPassword) => {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error('Kullanıcı girişi yapılmamış');
+  }
+
+  try {
+    // Kullanıcıyı yeniden doğrula
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+
+    // Şifreyi güncelle
+    await updatePassword(user, newPassword);
+
+    return true;
+  } catch (error) {
+    console.error('Şifre güncelleme hatası:', error);
+    throw error;
   }
 };

@@ -14,6 +14,7 @@ import Edit from "./pages/edit";
 import BlogDetail from "./pages/blog/[id]";
 import AdminPanel from "./pages/Admin";
 import Unauthorized from "./pages/Unauthorized";
+import Settings from './pages/settings';
 
 // Components
 import Navbar from "./components/Navbar";
@@ -65,6 +66,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/settings" element={<Settings />} />
               </Routes>
             </div>
             <ToastContainer />

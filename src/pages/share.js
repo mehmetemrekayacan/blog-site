@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { storage } from '../services/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 const Share = () => {
   const [title, setTitle] = useState('');
@@ -21,26 +21,73 @@ const Share = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Dosya boyutu kontrolü (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Dosya boyutu 5MB\'dan küçük olmalıdır.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Dosya tipi kontrolü
+    if (!file.type.startsWith('image/')) {
+      toast.error('Lütfen geçerli bir resim dosyası seçin.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
     setUploadingImage(true);
     try {
-      const storageRef = ref(storage, `blog-images/${Date.now()}-${file.name}`);
-      await uploadBytes(storageRef, file);
-      const imageUrl = await getDownloadURL(storageRef);
+      // Eski blog resmini sil
+      if (imageUrl) {
+        try {
+          const oldImageRef = ref(storage, imageUrl);
+          await deleteObject(oldImageRef);
+        } catch (error) {
+          console.error('Eski blog resmi silinirken hata:', error);
+          // Eski resim silinemese bile devam et
+        }
+      }
+
+      // Benzersiz dosya adı oluştur
+      const timestamp = Date.now();
+      const uniqueFileName = `${currentUser.uid}_${timestamp}_${file.name}`;
       
-      // Görsel URL'sini state'e ekle
-      setImageUrl(imageUrl);
+      const storageRef = ref(storage, `blog-images/${uniqueFileName}`);
       
-      toast.success('Görsel başarıyla yüklendi!', {
+      // Metadata ekle
+      const metadata = {
+        contentType: file.type,
+        customMetadata: {
+          'userId': currentUser.uid,
+          'uploadedAt': timestamp.toString()
+        }
+      };
+      
+      // Dosyayı yükle
+      await uploadBytes(storageRef, file, metadata);
+      
+      // Yüklenen dosyanın URL'sini al
+      const newImageUrl = await getDownloadURL(storageRef);
+      setImageUrl(newImageUrl);
+      
+      toast.success('Blog resmi başarıyla yüklendi!', {
         position: 'top-right',
         autoClose: 3000,
       });
     } catch (error) {
+      console.error('Resim yükleme hatası:', error);
       toast.error(`Hata: ${error.message}`, {
         position: 'top-right',
         autoClose: 3000,
       });
     } finally {
       setUploadingImage(false);
+      // Input'u temizle
+      event.target.value = '';
     }
   };
 
