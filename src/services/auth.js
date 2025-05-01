@@ -9,7 +9,7 @@ import {
   EmailAuthProvider
 } from 'firebase/auth';
 import { auth } from './firebase';
-import { getDoc, doc, getDocs, collection, deleteDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { getDoc, doc, getDocs, collection, deleteDoc, setDoc, serverTimestamp, updateDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
 // Yardımcı fonksiyon: Hata mesajlarını özelleştirme
@@ -138,7 +138,56 @@ export const updateUserProfile = async (displayName, photoURL) => {
   }
 
   try {
+    // 1. Firebase Auth profilini güncelle
     await updateProfile(user, { displayName, photoURL });
+
+    // 2. Kullanıcının blog yazılarını güncelle
+    const blogsRef = collection(db, 'blogs');
+    const blogsQuery = query(blogsRef, where('userId', '==', user.uid));
+    const blogsSnapshot = await getDocs(blogsQuery);
+    
+    const blogUpdatePromises = blogsSnapshot.docs.map(doc => 
+      updateDoc(doc.ref, {
+        authorPhotoURL: photoURL,
+        author: displayName
+      })
+    );
+
+    // 3. Kullanıcının tüm yorumlarını güncelle
+    const commentsRef = collection(db, 'comments');
+    const commentsQuery = query(commentsRef, where('userId', '==', user.uid));
+    const commentsSnapshot = await getDocs(commentsQuery);
+    
+    const commentUpdatePromises = commentsSnapshot.docs.map(doc => 
+      updateDoc(doc.ref, {
+        authorPhotoURL: photoURL,
+        author: displayName
+      })
+    );
+
+    // 4. Tüm yorumlardaki bu kullanıcıya ait yanıtları güncelle
+    const allCommentsSnapshot = await getDocs(commentsRef);
+    const replyUpdatePromises = allCommentsSnapshot.docs.map(doc => {
+      const commentData = doc.data();
+      if (commentData.replies && Array.isArray(commentData.replies)) {
+        const updatedReplies = commentData.replies.map(reply => {
+          if (reply.userId === user.uid) {
+            return {
+              ...reply,
+              authorPhotoURL: photoURL,
+              author: displayName
+            };
+          }
+          return reply;
+        });
+        return updateDoc(doc.ref, { replies: updatedReplies });
+      }
+      return null;
+    }).filter(Boolean);
+
+    // Tüm güncellemeleri paralel olarak yap
+    await Promise.all([...blogUpdatePromises, ...commentUpdatePromises, ...replyUpdatePromises]);
+
     return user;
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
@@ -194,9 +243,44 @@ export const getAllUsers = async () => {
 // Kullanıcı silme (admin için)
 export const deleteUserByAdmin = async (userId) => {
   try {
+    // 1. Kullanıcının bloglarını sil
+    const blogsRef = collection(db, 'blogs');
+    const blogsQuery = query(blogsRef, where('userId', '==', userId));
+    const blogsSnapshot = await getDocs(blogsQuery);
+    for (const blogDoc of blogsSnapshot.docs) {
+      await deleteDoc(doc(db, 'blogs', blogDoc.id));
+    }
+
+    // 2. Kullanıcının yorumlarını sil
+    const commentsRef = collection(db, 'comments');
+    const commentsQuery = query(commentsRef, where('userId', '==', userId));
+    const commentsSnapshot = await getDocs(commentsQuery);
+    for (const commentDoc of commentsSnapshot.docs) {
+      await deleteDoc(doc(db, 'comments', commentDoc.id));
+    }
+
+    // 3. Tüm yorumlardaki bu kullanıcıya ait yanıtları sil
+    const allCommentsSnapshot = await getDocs(commentsRef);
+    for (const commentDoc of allCommentsSnapshot.docs) {
+      const commentData = commentDoc.data();
+      if (commentData.replies && Array.isArray(commentData.replies)) {
+        const updatedReplies = commentData.replies.filter(r => r.userId !== userId);
+        if (updatedReplies.length !== commentData.replies.length) {
+          await updateDoc(doc(db, 'comments', commentDoc.id), { replies: updatedReplies });
+        }
+      }
+    }
+
+    // 4. Kullanıcıyı Firestore'dan sil
     await deleteDoc(doc(db, 'users', userId));
+
+    // 5. Firebase Authentication'dan silmek için:
+    // Bunu doğrudan istemci tarafında yapamazsınız. Bunun için bir backend veya Cloud Function gerekir.
+    // Öneri: Bir Cloud Function ile admin.auth().deleteUser(userId) çağrısı yapabilirsiniz.
+    // https://firebase.google.com/docs/auth/admin/manage-users#delete_a_user
+
     return true;
   } catch (error) {
-    throw new Error('Kullanıcı silinirken bir hata oluştu: ' + error.message);
+    throw new Error('Kullanıcı ve içerikleri silinirken bir hata oluştu: ' + error.message);
   }
 };

@@ -38,9 +38,9 @@ const Profile = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Dosya boyutu kontrolü (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Dosya boyutu 5MB\'dan küçük olmalıdır.', {
+    // Dosya boyutu kontrolü (2MB limit)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Dosya boyutu 2MB\'dan küçük olmalıdır.', {
         position: 'top-right',
         autoClose: 3000,
       });
@@ -58,6 +58,9 @@ const Profile = () => {
 
     setUploadingPhoto(true);
     try {
+      // Resmi optimize et
+      const optimizedImage = await optimizeImage(file);
+      
       // Benzersiz dosya adı oluştur
       const timestamp = Date.now();
       const uniqueFileName = `${currentUser.uid}_${timestamp}_${file.name}`;
@@ -66,15 +69,17 @@ const Profile = () => {
       
       // Metadata ekle
       const metadata = {
-        contentType: file.type,
+        contentType: 'image/jpeg', // Her zaman JPEG olarak kaydet
         customMetadata: {
           'userId': currentUser.uid,
-          'uploadedAt': timestamp.toString()
-        }
+          'uploadedAt': timestamp.toString(),
+          'optimized': 'true'
+        },
+        cacheControl: 'public,max-age=31536000' // 1 yıl önbellek
       };
       
       // Dosyayı yükle
-      await uploadBytes(storageRef, file, metadata);
+      await uploadBytes(storageRef, optimizedImage, metadata);
       
       // Yüklenen dosyanın URL'sini al
       const photoURL = await getDownloadURL(storageRef);
@@ -97,6 +102,50 @@ const Profile = () => {
       // Input'u temizle
       event.target.value = '';
     }
+  };
+
+  // Resim optimizasyon fonksiyonu
+  const optimizeImage = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 400; // Maksimum genişlik
+          const MAX_HEIGHT = 400; // Maksimum yükseklik
+          let width = img.width;
+          let height = img.height;
+
+          // Boyutları orantılı olarak ayarla
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // JPEG olarak dönüştür ve kaliteyi ayarla
+          canvas.toBlob((blob) => {
+            resolve(blob);
+          }, 'image/jpeg', 0.8); // 0.8 kalite oranı
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
   };
 
   const handleReauthenticateAndDelete = async () => {

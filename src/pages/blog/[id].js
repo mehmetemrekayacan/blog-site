@@ -187,6 +187,11 @@ const BlogDetail = () => {
               src={blog.authorPhotoURL || `https://ui-avatars.com/api/?name=${blog.author}&background=random`}
               alt={blog.author}
               className="w-8 h-8 rounded-full object-cover mr-2"
+              loading="lazy"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = `https://ui-avatars.com/api/?name=${blog.author}&background=random`;
+              }}
             />
             <span className="mr-4">Yazar: {blog.author}</span>
             <span>

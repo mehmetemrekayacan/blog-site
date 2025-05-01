@@ -12,7 +12,7 @@ import Profile from "./pages/profile";
 import Share from "./pages/share";
 import Edit from "./pages/edit";
 import BlogDetail from "./pages/blog/[id]";
-import { AdminPanel } from "./pages/Admin";
+import AdminPanel from "./pages/Admin";
 import Unauthorized from "./pages/Unauthorized";
 
 // Components

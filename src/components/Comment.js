@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { deleteComment, addReply, toggleCommentLike } from '../services/commentService';
 import { toast } from 'react-toastify';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 const Comment = ({ comment, currentUser, onDelete }) => {
   const [showReplyForm, setShowReplyForm] = useState(false);
@@ -21,6 +23,7 @@ const Comment = ({ comment, currentUser, onDelete }) => {
   };
 
   const handleDelete = async () => {
+    if (!window.confirm('Bu yorumu silmek istediğinizden emin misiniz?')) return;
     try {
       await deleteComment(comment.id);
       onDelete(comment.id);
@@ -78,6 +81,20 @@ const Comment = ({ comment, currentUser, onDelete }) => {
     }
   };
 
+  // Yanıt silme (sadece admin veya yanıt sahibi için)
+  const handleDeleteReply = async (replyId) => {
+    if (!window.confirm('Bu yanıtı silmek istediğinizden emin misiniz?')) return;
+    try {
+      // Yanıtı replies dizisinden çıkar
+      const updatedReplies = replies.filter(r => r.id !== replyId);
+      await updateDoc(doc(db, 'comments', comment.id), { replies: updatedReplies });
+      setReplies(updatedReplies);
+      toast.success('Yanıt başarıyla silindi!');
+    } catch (error) {
+      toast.error('Yanıt silinirken bir hata oluştu.');
+    }
+  };
+
   return (
     <div className="border-l-4 border-indigo-500 pl-4 mb-4">
       <div className="flex items-start gap-2">
@@ -85,6 +102,11 @@ const Comment = ({ comment, currentUser, onDelete }) => {
           src={comment.authorPhotoURL || `https://ui-avatars.com/api/?name=${comment.author}&background=random`}
           alt={comment.author}
           className="w-8 h-8 rounded-full"
+          loading="lazy"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = `https://ui-avatars.com/api/?name=${comment.author}&background=random`;
+          }}
         />
         <div className="flex-1">
           <div className="bg-gray-50 p-3 rounded-lg">
@@ -175,6 +197,11 @@ const Comment = ({ comment, currentUser, onDelete }) => {
                       src={reply.authorPhotoURL || `https://ui-avatars.com/api/?name=${reply.author}&background=random`}
                       alt={reply.author}
                       className="w-6 h-6 rounded-full"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = `https://ui-avatars.com/api/?name=${reply.author}&background=random`;
+                      }}
                     />
                     <div className="flex-1">
                       <div className="bg-gray-50 p-2 rounded-lg">
@@ -185,6 +212,15 @@ const Comment = ({ comment, currentUser, onDelete }) => {
                           </span>
                         </div>
                         <p className="text-gray-700 text-sm">{reply.content}</p>
+                        {/* Yanıt silme butonu */}
+                        {currentUser && (currentUser.uid === reply.userId || currentUser.isAdmin) && (
+                          <button
+                            onClick={() => handleDeleteReply(reply.id)}
+                            className="text-xs text-red-500 hover:text-red-600 mt-1"
+                          >
+                            Yanıtı Sil
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
