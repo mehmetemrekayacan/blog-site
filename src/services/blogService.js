@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   getDoc,
   updateDoc,
-  increment
+  increment,
+  limit as firestoreLimit
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -87,11 +88,15 @@ export const toggleLike = async (blogId, userId) => {
 export const getBlogs = async ({ limit = 10, filterTags = null } = {}) => {
   try {
     const blogsRef = collection(db, 'blogs');
-    let q = query(blogsRef, orderBy('createdAt', 'desc'));
+    let q = query(blogsRef, orderBy('createdAt', 'desc'), firestoreLimit(limit));
 
     // Etiket filtresi (opsiyonel)
     if (filterTags) {
-      q = query(blogsRef, where('tags', 'array-contains-any', filterTags), orderBy('createdAt', 'desc'));
+      q = query(blogsRef, 
+        where('tags', 'array-contains-any', filterTags), 
+        orderBy('createdAt', 'desc'),
+        firestoreLimit(limit)
+      );
     }
 
     const querySnapshot = await getDocs(q);
@@ -100,8 +105,7 @@ export const getBlogs = async ({ limit = 10, filterTags = null } = {}) => {
       ...doc.data(),
     }));
 
-    // Limit uygulama (istemci tarafında, çünkü Firestore sorgusu limit olmadan çalıştı)
-    return blogs.slice(0, limit);
+    return blogs;
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
   }
@@ -118,7 +122,8 @@ export const getUserBlogs = async (userId, { limit = 10 } = {}) => {
     const q = query(
       blogsRef,
       where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      firestoreLimit(limit)
     );
     const querySnapshot = await getDocs(q);
     const blogs = querySnapshot.docs.map((doc) => ({
@@ -126,7 +131,7 @@ export const getUserBlogs = async (userId, { limit = 10 } = {}) => {
       ...doc.data(),
     }));
 
-    return blogs.slice(0, limit);
+    return blogs;
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
   }
