@@ -1,15 +1,36 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { deleteBlog, toggleLike } from '../services/blogService';
+import { getBlogComments } from '../services/commentService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
 const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userId, currentUser, likeCount = 0, likedBy = [], authorPhotoURL }) => {
   const [isLiked, setIsLiked] = useState(likedBy.includes(currentUser?.uid));
+  const [currentLikeCount, setCurrentLikeCount] = useState(likeCount);
+  const [commentCount, setCommentCount] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const navigate = useNavigate();
   const menuRef = useRef(null);
+
+  // Yorum sayısını al
+  useEffect(() => {
+    const fetchCommentCount = async () => {
+      try {
+        const comments = await getBlogComments(id);
+        // Toplam yorum sayısını hesapla (ana yorumlar + yanıtlar)
+        const totalComments = comments.reduce((total, comment) => {
+          return total + 1 + (comment.replies?.length || 0);
+        }, 0);
+        setCommentCount(totalComments);
+      } catch (error) {
+        console.error('Yorum sayısı alınırken hata:', error);
+      }
+    };
+
+    fetchCommentCount();
+  }, [id]);
 
   // Menü dışına tıklandığında menüyü kapat
   useEffect(() => {
@@ -37,6 +58,7 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
     try {
       const newLikeState = await toggleLike(id, currentUser.uid);
       setIsLiked(newLikeState);
+      setCurrentLikeCount(prevCount => newLikeState ? prevCount + 1 : prevCount - 1);
     } catch (error) {
       toast.error(`Hata: ${error.message}`, {
         position: 'top-right',
@@ -198,26 +220,45 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
           </div>
         )}
 
-        {/* Beğenme Butonu */}
-        <button
-          onClick={handleLike}
-          className={`flex items-center gap-2 text-sm font-medium transition-colors duration-200 ${
-            isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-400'
-          }`}
-        >
-          <svg
-            className={`w-5 h-5 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}`}
-            viewBox="0 0 24 24"
-            strokeWidth="2"
+        {/* Beğenme Butonu ve Yorum Sayısı */}
+        <div className="flex items-center gap-4 mt-4">
+          <button
+            onClick={handleLike}
+            className={`flex items-center gap-2 text-sm font-medium transition-colors duration-200 ${
+              isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-400'
+            }`}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-            />
-          </svg>
-          <span>{likeCount} {isLiked ? 'Beğenildi' : 'Beğen'}</span>
-        </button>
+            <svg
+              className={`w-5 h-5 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}`}
+              viewBox="0 0 24 24"
+              strokeWidth="2"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+            <span>{currentLikeCount} {isLiked ? 'Beğenildi' : 'Beğen'}</span>
+          </button>
+
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            <span>{commentCount} Yorum</span>
+          </div>
+        </div>
       </div>
 
       {/* Silme Onay Modalı */}
