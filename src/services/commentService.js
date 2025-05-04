@@ -40,7 +40,6 @@ export const createComment = async (commentData) => {
 
 // Blog için yorumları getirme
 export const getBlogComments = async (blogId) => {
-  console.log('getBlogComments ÇAĞRILDI:', blogId); // <-- EKLE
   try {
     const commentsRef = collection(db, 'comments');
     const q = query(
@@ -54,7 +53,6 @@ export const getBlogComments = async (blogId) => {
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate() || new Date()
     }));
-    console.log('getBlogComments SONUÇ:', blogId, comments); // <-- EKLE
     return comments;
   } catch (error) {
     console.error('Yorumları getirme hatası:', error);
