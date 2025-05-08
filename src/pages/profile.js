@@ -1,13 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { deleteCurrentUser, updateUserProfile } from '../services/auth';
 import { toast } from 'react-toastify';
 import { storage } from '../services/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { collection, query, where, getDocs, orderBy, addDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, addDoc, deleteDoc, doc, getDoc, getCountFromServer } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import BlogCard from '../components/BlogCard';
 import { Link } from 'react-router-dom';
+import { followUser, unfollowUser, checkFollowingStatus } from '../services/followService';
 
 const Profile = () => {
   const { currentUser } = useAuth();
@@ -19,62 +20,47 @@ const Profile = () => {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [userStats, setUserStats] = useState({
     postCount: 0,
-    likeCount: 0,
     followerCount: 0,
     followingCount: 0
   });
   const [userBlogs, setUserBlogs] = useState([]);
   const [loadingBlogs, setLoadingBlogs] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    const fetchUserStats = async () => {
+    if (!currentUser) return;
+
+    const fetchStats = async () => {
       try {
-        // Blog sayısını al
-        const blogsQuery = query(
-          collection(db, 'blogs'),
-          where('userId', '==', currentUser.uid)
-        );
+        const blogsQuery = query(collection(db, 'blogs'), where('userId', '==', currentUser.uid));
         const blogsSnapshot = await getDocs(blogsQuery);
         const postCount = blogsSnapshot.size;
 
-        // Beğeni sayısını al
-        const likesQuery = query(
-          collection(db, 'likes'),
-          where('userId', '==', currentUser.uid)
-        );
-        const likesSnapshot = await getDocs(likesQuery);
-        const likeCount = likesSnapshot.size;
+        const followersColRef = collection(db, 'users', currentUser.uid, 'followers');
+        const followersSnapshot = await getCountFromServer(followersColRef);
+        const followerCount = followersSnapshot.data().count;
 
-        // Takipçi sayısını al
-        const followersQuery = query(
-          collection(db, 'followers'),
-          where('userId', '==', currentUser.uid)
-        );
-        const followersSnapshot = await getDocs(followersQuery);
-        const followerCount = followersSnapshot.size;
-
-        // Takip edilen sayısını al
-        const followingQuery = query(
-          collection(db, 'following'),
-          where('userId', '==', currentUser.uid)
-        );
-        const followingSnapshot = await getDocs(followingQuery);
-        const followingCount = followingSnapshot.size;
+        const followingColRef = collection(db, 'users', currentUser.uid, 'following');
+        const followingSnapshot = await getCountFromServer(followingColRef);
+        const followingCount = followingSnapshot.data().count;
 
         setUserStats({
           postCount,
-          likeCount,
           followerCount,
           followingCount
         });
       } catch (error) {
-        console.error('İstatistikler yüklenirken hata:', error);
+        console.error('Kullanıcı istatistikleri yüklenirken hata:', error);
+        toast.error('İstatistikler yüklenirken bir hata oluştu.');
       }
     };
 
+    fetchStats();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
     const fetchUserBlogs = async () => {
       try {
         setLoadingBlogs(true);
@@ -96,24 +82,7 @@ const Profile = () => {
         setLoadingBlogs(false);
       }
     };
-
-    const checkFollowingStatus = async () => {
-      if (currentUser) {
-        const followingQuery = query(
-          collection(db, 'following'),
-          where('userId', '==', currentUser.uid),
-          where('followingId', '==', currentUser.uid)
-        );
-        const followingSnapshot = await getDocs(followingQuery);
-        setIsFollowing(!followingSnapshot.empty);
-      }
-    };
-
-    if (currentUser) {
-      fetchUserStats();
-      fetchUserBlogs();
-      checkFollowingStatus();
-    }
+    fetchUserBlogs();
   }, [currentUser]);
 
   const handleUpdateProfile = async () => {
@@ -139,7 +108,6 @@ const Profile = () => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Dosya boyutu kontrolü (2MB limit)
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Dosya boyutu 2MB\'dan küçük olmalıdır.', {
         position: 'top-right',
@@ -148,7 +116,6 @@ const Profile = () => {
       return;
     }
 
-    // Dosya tipi kontrolü
     if (!file.type.startsWith('image/')) {
       toast.error('Lütfen geçerli bir resim dosyası seçin.', {
         position: 'top-right',
@@ -159,55 +126,44 @@ const Profile = () => {
 
     setUploadingPhoto(true);
     try {
-      // Resmi optimize et
       const optimizedImage = await optimizeImage(file);
       
-      // Benzersiz dosya adı oluştur
       const timestamp = Date.now();
       const uniqueFileName = `${currentUser.uid}_${timestamp}_${file.name}`;
       
       const storageRef = ref(storage, `profile-photos/${uniqueFileName}`);
       
-      // Metadata ekle
       const metadata = {
-        contentType: 'image/jpeg', // Her zaman JPEG olarak kaydet
+        contentType: 'image/jpeg',
         customMetadata: {
           'userId': currentUser.uid,
           'uploadedAt': timestamp.toString(),
           'optimized': 'true'
         },
-        cacheControl: 'public,max-age=31536000' // 1 yıl önbellek
+        cacheControl: 'public,max-age=31536000'
       };
       
-      // Eski profil fotoğrafını sil
       if (currentUser.photoURL) {
         try {
-          // URL'den dosya yolunu çıkar
           const photoURL = new URL(currentUser.photoURL);
           const pathSegments = photoURL.pathname.split('/');
           const filePath = pathSegments.slice(pathSegments.indexOf('o') + 1).join('/');
           
-          // URL decode işlemi
           const decodedPath = decodeURIComponent(filePath);
           
-          // Dosyayı sil
           const oldPhotoRef = ref(storage, decodedPath);
           await deleteObject(oldPhotoRef);
         } catch (error) {
-          // Eğer dosya zaten silinmişse veya bulunamazsa hata verme
           if (error.code !== 'storage/object-not-found') {
             console.error('Eski profil fotoğrafı silinirken hata:', error);
           }
         }
       }
       
-      // Dosyayı yükle
       await uploadBytes(storageRef, optimizedImage, metadata);
       
-      // Yüklenen dosyanın URL'sini al
       const photoURL = await getDownloadURL(storageRef);
       
-      // Kullanıcı profilini güncelle
       await updateUserProfile(currentUser.displayName, photoURL);
       
       toast.success('Profil fotoğrafı başarıyla güncellendi!', {
@@ -222,12 +178,10 @@ const Profile = () => {
       });
     } finally {
       setUploadingPhoto(false);
-      // Input'u temizle
       event.target.value = '';
     }
   };
 
-  // Resim optimizasyon fonksiyonu
   const optimizeImage = async (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -237,12 +191,11 @@ const Profile = () => {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 400; // Maksimum genişlik
-          const MAX_HEIGHT = 400; // Maksimum yükseklik
+          const MAX_WIDTH = 400;
+          const MAX_HEIGHT = 400;
           let width = img.width;
           let height = img.height;
 
-          // Boyutları orantılı olarak ayarla
           if (width > height) {
             if (width > MAX_WIDTH) {
               height *= MAX_WIDTH / width;
@@ -260,10 +213,9 @@ const Profile = () => {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // JPEG olarak dönüştür ve kaliteyi ayarla
           canvas.toBlob((blob) => {
             resolve(blob);
-          }, 'image/jpeg', 0.8); // 0.8 kalite oranı
+          }, 'image/jpeg', 0.8);
         };
         img.onerror = reject;
       };
@@ -292,57 +244,6 @@ const Profile = () => {
     }
   };
 
-  const handleFollow = async () => {
-    try {
-      if (isFollowing) {
-        // Takibi bırak
-        const followingQuery = query(
-          collection(db, 'following'),
-          where('userId', '==', currentUser.uid),
-          where('followingId', '==', currentUser.uid)
-        );
-        const followingSnapshot = await getDocs(followingQuery);
-        followingSnapshot.forEach(async (doc) => {
-          await deleteDoc(doc.ref);
-        });
-
-        // Takipçi listesinden kaldır
-        const followersQuery = query(
-          collection(db, 'followers'),
-          where('userId', '==', currentUser.uid),
-          where('followerId', '==', currentUser.uid)
-        );
-        const followersSnapshot = await getDocs(followersQuery);
-        followersSnapshot.forEach(async (doc) => {
-          await deleteDoc(doc.ref);
-        });
-
-        setIsFollowing(false);
-        toast.success('Takip bırakıldı');
-      } else {
-        // Takip et
-        await addDoc(collection(db, 'following'), {
-          userId: currentUser.uid,
-          followingId: currentUser.uid,
-          createdAt: new Date()
-        });
-
-        // Takipçi listesine ekle
-        await addDoc(collection(db, 'followers'), {
-          userId: currentUser.uid,
-          followerId: currentUser.uid,
-          createdAt: new Date()
-        });
-
-        setIsFollowing(true);
-        toast.success('Takip edildi');
-      }
-    } catch (error) {
-      console.error('Takip işlemi sırasında hata:', error);
-      toast.error('Bir hata oluştu');
-    }
-  };
-
   if (!currentUser) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
@@ -359,7 +260,6 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        {/* Profil Bilgileri */}
         <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
@@ -403,7 +303,6 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Profil Fotoğrafı ve Takip Butonu */}
           <div className="flex flex-col items-center mb-6">
             <div className="relative">
               <img
@@ -447,26 +346,15 @@ const Profile = () => {
             {uploadingPhoto && (
               <p className="mt-2 text-sm text-gray-500">Fotoğraf yükleniyor...</p>
             )}
-            <button
-              onClick={handleFollow}
-              className={`mt-4 px-4 py-2 rounded-md ${
-                isFollowing
-                  ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  : 'bg-indigo-500 text-white hover:bg-indigo-600'
-              } transition-colors duration-200`}
-            >
-              {isFollowing ? 'Takibi Bırak' : 'Takip Et'}
-            </button>
           </div>
 
-          {/* İstatistikler */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="text-center">
               <div className="text-2xl font-bold text-indigo-600">{userStats.postCount}</div>
               <div className="text-sm text-gray-600">Gönderi</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-indigo-600">{userStats.likeCount}</div>
+              <div className="text-2xl font-bold text-indigo-600">0</div>
               <div className="text-sm text-gray-600">Beğeni</div>
             </div>
             <div className="text-center">
@@ -479,7 +367,6 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Kullanıcı Bilgileri */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <span className="text-gray-700 font-medium">Kullanıcı Adı:</span>
@@ -560,7 +447,6 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Kullanıcının Blog Gönderileri */}
         <div className="bg-white p-6 rounded-xl shadow-lg">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Gönderiler</h2>
           {loadingBlogs ? (
@@ -595,7 +481,6 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Silme Onay Modalı */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
