@@ -15,6 +15,7 @@ const Home = lazy(() => import("./pages"));
 const Login = lazy(() => import("./pages/login"));
 const Register = lazy(() => import("./pages/register"));
 const Profile = lazy(() => import("./pages/profile"));
+const UserProfile = lazy(() => import("./pages/UserProfile"));
 const Share = lazy(() => import("./pages/share"));
 const Edit = lazy(() => import("./pages/edit"));
 const BlogDetail = lazy(() => import("./pages/blog/[id]"));
@@ -37,6 +38,7 @@ function App() {
                   <Route path="/register" element={<Register />} />
                   <Route path="/blog/:id" element={<BlogDetail />} />
                   <Route path="/unauthorized" element={<Unauthorized />} />
+                  <Route path="/user/:userId" element={<UserProfile />} />
                   <Route
                     path="/profile"
                     element={

@@ -126,6 +126,24 @@ const BlogDetail = () => {
     setComments(updatedComments);
   };
 
+  const getEmbedUrl = (url) => {
+    if (!url) return null;
+    
+    // YouTube URL'sini işle
+    if (url.includes('youtube.com')) {
+      const videoId = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      return videoId ? `https://www.youtube.com/embed/${videoId[1]}` : null;
+    }
+    
+    // Vimeo URL'sini işle
+    if (url.includes('vimeo.com')) {
+      const videoId = url.match(/(?:vimeo\.com\/)([^"&?\/\s]+)/);
+      return videoId ? `https://player.vimeo.com/video/${videoId[1]}` : null;
+    }
+    
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -209,6 +227,21 @@ const BlogDetail = () => {
               </span>
             ))}
           </div>
+
+          {/* Video Gösterimi */}
+          {blog.videoUrl && getEmbedUrl(blog.videoUrl) && (
+            <div className="mb-6">
+              <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-lg">
+                <iframe
+                  src={getEmbedUrl(blog.videoUrl)}
+                  className="absolute top-0 left-0 w-full h-full"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            </div>
+          )}
 
           <div className="prose max-w-none mb-6">
             <p className="text-gray-700 whitespace-pre-wrap">{blog.content}</p>

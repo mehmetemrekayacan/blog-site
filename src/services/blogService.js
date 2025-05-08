@@ -21,7 +21,7 @@ const getFriendlyErrorMessage = (error) => {
     case 'permission-denied':
       return 'Bu işlem için yetkiniz yok.';
     case 'not-found':
-      return 'Blog bulunamadı.';
+      return 'Blog veya kullanıcı bulunamadı.';
     case 'unavailable':
       return 'Servis şu anda kullanılamıyor, lütfen daha sonra tekrar deneyin.';
     default:
@@ -29,17 +29,37 @@ const getFriendlyErrorMessage = (error) => {
   }
 };
 
+// Yardımcı fonksiyon: Türkçe karakterleri normalize etme
+const normalizeTurkishChars = (str) => {
+  if (!str) return '';
+  let s = str;
+  s = s.replace(/İ/g, 'i').replace(/I/g, 'i'); // Büyük I ve noktalı İ için
+  s = s.toLowerCase(); // Önce her şeyi küçük harfe çevir
+  s = s.replace(/[ıi]/g, 'i');
+  s = s.replace(/ü/g, 'u');
+  s = s.replace(/ö/g, 'o');
+  s = s.replace(/ş/g, 's');
+  s = s.replace(/ç/g, 'c');
+  s = s.replace(/ğ/g, 'g');
+  return s;
+};
+
 // Yeni blog oluşturma
 export const createBlog = async (blogData) => {
   try {
     const blogsRef = collection(db, 'blogs');
-    const newBlog = await addDoc(blogsRef, {
+    const title = blogData.title || '';
+    const dataToSave = {
       ...blogData,
-      createdAt: serverTimestamp(), // Sunucu zaman damgası
-      updatedAt: serverTimestamp(), // Güncelleme zaman damgası
-      likeCount: 0, // Beğeni sayısı başlangıçta 0
-      likedBy: [] // Beğenen kullanıcıların ID'leri
-    });
+      title: title, // Orijinal başlık
+      title_lowercase: title.toLowerCase(),
+      title_normalized: normalizeTurkishChars(title), // Normalize edilmiş başlık
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      likeCount: 0,
+      likedBy: []
+    };
+    const newBlog = await addDoc(blogsRef, dataToSave);
     return newBlog.id;
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
@@ -160,19 +180,32 @@ export const updateBlog = async (blogId, blogData) => {
 
   try {
     const blogRef = doc(db, 'blogs', blogId);
-    const blogDoc = await getDoc(blogRef);
+    // Güncellenecek dokümanın varlığını kontrol etmeye gerek yok, updateDoc hata verecektir.
+    // Ancak yine de kontrol etmek isterseniz eski kod kalabilir.
 
-    if (!blogDoc.exists()) {
-      throw new Error('Blog bulunamadı.');
-    }
-
-    await updateDoc(blogRef, {
+    const dataToUpdate = {
       ...blogData,
       updatedAt: serverTimestamp(),
-    });
+    };
 
+    // Eğer başlık güncelleniyorsa, title_lowercase ve title_normalized da güncelle
+    if (blogData.title) {
+      const title = blogData.title;
+      dataToUpdate.title_lowercase = title.toLowerCase();
+      dataToUpdate.title_normalized = normalizeTurkishChars(title);
+    } else if (blogData.hasOwnProperty('title') && blogData.title === '') {
+      // Başlık kasıtlı olarak boşaltılıyorsa normalize edilmiş alanları da boşalt
+      dataToUpdate.title_lowercase = '';
+      dataToUpdate.title_normalized = '';
+    }
+
+    await updateDoc(blogRef, dataToUpdate);
     return true;
   } catch (error) {
+    // Firestore'dan gelen hatayı doğrudan veya özelleştirilmiş mesajla fırlat
+    if (error.code === 'not-found') {
+        throw new Error('Güncellenmek istenen blog bulunamadı.');
+    }
     throw new Error(getFriendlyErrorMessage(error));
   }
 };

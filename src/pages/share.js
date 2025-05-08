@@ -11,6 +11,7 @@ const Share = () => {
   const [content, setContent] = useState('');
   const [tags, setTags] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const { currentUser } = useAuth();
@@ -103,6 +104,7 @@ const Share = () => {
         authorPhotoURL: currentUser.photoURL,
         tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
         imageUrl: imageUrl || null,
+        videoUrl: videoUrl || null,
         createdAt: new Date().toISOString(),
       };
       await createBlog(blogData);
@@ -114,6 +116,7 @@ const Share = () => {
       setContent('');
       setTags('');
       setImageUrl('');
+      setVideoUrl('');
       navigate('/');
     } catch (error) {
       toast.error(`Hata: ${error.message}`, {
@@ -238,6 +241,23 @@ const Share = () => {
                 />
               </div>
             )}
+          </div>
+
+          {/* Video URL */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Video URL (YouTube, Vimeo vb.)
+            </label>
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              YouTube, Vimeo gibi platformlardan video URL'si ekleyebilirsiniz.
+            </p>
           </div>
 
           {/* Paylaş Butonu */}

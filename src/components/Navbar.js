@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { logoutUser, isAdmin } from "../services/auth";
 import { toast } from "react-toastify";
+import SearchBar from "./SearchBar";
 
 const Navbar = () => {
   const { currentUser } = useAuth();
@@ -38,28 +39,36 @@ const Navbar = () => {
 
   return (
     <nav className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white shadow-lg sticky top-0 z-50">
-      <div className="container mx-auto flex justify-between items-center">
-        {/* Logo */}
-        <Link
-          to="/"
-          className="text-2xl font-bold tracking-tight hover:text-indigo-200 transition-colors duration-200"
-        >
-          BlogSphere
-        </Link>
+      <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex justify-between items-center w-full md:w-auto">
+          {/* Logo */}
+          <Link
+            to="/"
+            className="text-2xl font-bold tracking-tight hover:text-indigo-200 transition-colors duration-200"
+          >
+            BlogSphere
+          </Link>
 
-        {/* Hamburger Menü (Mobil için) */}
-        <button
-          className="md:hidden text-2xl focus:outline-none"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          {isMenuOpen ? "✖" : "☰"}
-        </button>
+          {/* Hamburger Menü (Mobil için) */}
+          <button
+            className="md:hidden text-2xl focus:outline-none"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? "✖" : "☰"}
+          </button>
+        </div>
+
+        {/* SearchBar - Doğrudan Navbar içinde */}
+        {/* Mobil için w-full, masaüstünde ortada ve belirli bir genişlikte */}
+        <div className="w-full md:w-auto md:flex-grow md:max-w-lg order-2"> {/* order-2: Logo'dan sonra, Menü'den önce */}
+          <SearchBar />
+        </div>
 
         {/* Menü Öğeleri */}
         <div
-          className={`${
+          className={`w-full md:w-auto order-3 ${
             isMenuOpen ? "flex" : "hidden"
-          } md:flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 absolute md:static top-16 left-0 w-full md:w-auto bg-blue-600 md:bg-transparent p-4 md:p-0 transition-all duration-300`}
+          } md:flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6 absolute md:static top-full left-0 md:top-auto md:left-auto bg-blue-600 md:bg-transparent p-4 md:p-0 transition-all duration-300 mt-1 md:mt-0`}
         >
           {currentUser ? (
             <>

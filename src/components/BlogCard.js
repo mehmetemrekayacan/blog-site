@@ -5,7 +5,7 @@ import { getBlogComments } from '../services/commentService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
-const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userId, currentUser, likeCount = 0, likedBy = [], authorPhotoURL }) => {
+const BlogCard = ({ id, title, content, author, date, imageUrl, videoUrl, tags = [], userId, currentUser, likeCount = 0, likedBy = [], authorPhotoURL }) => {
   const [isLiked, setIsLiked] = useState(likedBy.includes(currentUser?.uid));
   const [currentLikeCount, setCurrentLikeCount] = useState(likeCount);
   const [commentCount, setCommentCount] = useState(0);
@@ -43,6 +43,24 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const getEmbedUrl = (url) => {
+    if (!url) return null;
+    
+    // YouTube URL'sini işle
+    if (url.includes('youtube.com')) {
+      const videoId = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+      return videoId ? `https://www.youtube.com/embed/${videoId[1]}` : null;
+    }
+    
+    // Vimeo URL'sini işle
+    if (url.includes('vimeo.com')) {
+      const videoId = url.match(/(?:vimeo\.com\/)([^"&?\/\s]+)/);
+      return videoId ? `https://player.vimeo.com/video/${videoId[1]}` : null;
+    }
+    
+    return null;
+  };
 
   const handleLike = async (e) => {
     e.stopPropagation(); // Tıklama olayının üst elemana yayılmasını engelle
@@ -174,14 +192,24 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, tags = [], userI
           </div>
         )}
 
-        {/* Blog Görseli (Opsiyonel) */}
-        {imageUrl && (
+        {/* Blog Görseli veya Video */}
+        {imageUrl ? (
           <img
             src={imageUrl}
             alt={title}
             className="w-full h-48 object-cover rounded-t-2xl mb-4"
           />
-        )}
+        ) : videoUrl && getEmbedUrl(videoUrl) ? (
+          <div className="relative pb-[56.25%] h-0 overflow-hidden rounded-t-2xl mb-4">
+            <iframe
+              src={getEmbedUrl(videoUrl)}
+              className="absolute top-0 left-0 w-full h-full"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
+          </div>
+        ) : null}
 
         {/* Başlık */}
         <h2 className="text-2xl font-semibold text-gray-900 mb-2 hover:text-indigo-600 transition-colors duration-200">
@@ -306,6 +334,7 @@ BlogCard.propTypes = {
   author: PropTypes.string.isRequired,
   date: PropTypes.string,
   imageUrl: PropTypes.string,
+  videoUrl: PropTypes.string,
   tags: PropTypes.arrayOf(PropTypes.string),
   userId: PropTypes.string.isRequired,
   currentUser: PropTypes.object,

@@ -39,29 +39,47 @@ const getFriendlyErrorMessage = (error) => {
   }
 };
 
+// Yardımcı fonksiyon: Türkçe karakterleri normalize etme (SearchBar.js'teki ile aynı)
+const normalizeTurkishChars = (str) => {
+  if (!str) return '';
+  let s = str;
+  s = s.replace(/İ/g, 'i').replace(/I/g, 'i');
+  s = s.toLowerCase();
+  s = s.replace(/[ıi]/g, 'i');
+  s = s.replace(/ü/g, 'u');
+  s = s.replace(/ö/g, 'o');
+  s = s.replace(/ş/g, 's');
+  s = s.replace(/ç/g, 'c');
+  s = s.replace(/ğ/g, 'g');
+  return s;
+};
+
 // Kullanıcı kaydı
 export const registerUser = async (email, password, displayName) => {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // Kullanıcı profilini güncelle
-    await updateProfile(user, { displayName });
+    // Kullanıcı profilini Firebase Auth üzerinde güncelle (displayName ve photoURL başlangıçta null olabilir)
+    await updateProfile(user, { 
+      displayName: displayName,
+      photoURL: user.photoURL || null // Auth'tan gelen photoURL veya başlangıçta null
+    });
 
     // Firestore'da kullanıcı dokümanı oluştur
+    const usernameForSearch = displayName || email.split('@')[0]; // displayName yoksa e-postanın başını kullan
     await setDoc(doc(db, 'users', user.uid), {
       email: user.email,
-      displayName: displayName,
+      displayName: displayName, // Auth'a kaydedilen displayName
+      photoURL: user.photoURL || null, // Auth'a kaydedilen photoURL
+      username_lowercase: usernameForSearch.toLowerCase(),
+      username_normalized: normalizeTurkishChars(usernameForSearch),
       createdAt: serverTimestamp(),
       isAdmin: false // Varsayılan olarak admin değil
     });
 
-    // E-posta doğrulama gönder
     await sendEmailVerification(user);
-
-    // Kayıt sonrası otomatik giriş yapılmasını engellemek için çıkış yap
     await signOut(auth);
-
     return user;
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
@@ -145,54 +163,70 @@ export const updateUserProfile = async (displayName, photoURL) => {
     // 1. Firebase Auth profilini güncelle
     await updateProfile(user, { displayName, photoURL });
 
-    // 2. Kullanıcının blog yazılarını güncelle
+    // 2. Firestore'daki 'users' dokümanını güncelle
+    const userDocRef = doc(db, 'users', user.uid);
+    const usernameForSearchOnUpdate = displayName || user.email.split('@')[0]; // Güncellenmiş displayName veya e-posta
+    await updateDoc(userDocRef, {
+      displayName: displayName,
+      photoURL: photoURL,
+      username_lowercase: usernameForSearchOnUpdate.toLowerCase(),
+      username_normalized: normalizeTurkishChars(usernameForSearchOnUpdate)
+    });
+
+    // 3. Kullanıcının blog yazılarını güncelle
     const blogsRef = collection(db, 'blogs');
     const blogsQuery = query(blogsRef, where('userId', '==', user.uid));
     const blogsSnapshot = await getDocs(blogsQuery);
-    
-    const blogUpdatePromises = blogsSnapshot.docs.map(doc => 
-      updateDoc(doc.ref, {
+    const blogUpdatePromises = blogsSnapshot.docs.map(blogDoc => 
+      updateDoc(blogDoc.ref, {
         authorPhotoURL: photoURL,
-        author: displayName
+        author: displayName // Bloglardaki author alanı da displayName ile güncellenmeli
       })
     );
 
-    // 3. Kullanıcının tüm yorumlarını güncelle
+    // 4. Kullanıcının tüm yorumlarını güncelle
     const commentsRef = collection(db, 'comments');
     const commentsQuery = query(commentsRef, where('userId', '==', user.uid));
     const commentsSnapshot = await getDocs(commentsQuery);
-    
-    const commentUpdatePromises = commentsSnapshot.docs.map(doc => 
-      updateDoc(doc.ref, {
+    const commentUpdatePromises = commentsSnapshot.docs.map(commentDoc => 
+      updateDoc(commentDoc.ref, {
         authorPhotoURL: photoURL,
-        author: displayName
+        author: displayName // Yorumlardaki author alanı da displayName ile güncellenmeli
       })
     );
 
-    // 4. Tüm yorumlardaki bu kullanıcıya ait yanıtları güncelle
+    // 5. Tüm yorumlardaki bu kullanıcıya ait yanıtları güncelle
     const allCommentsSnapshot = await getDocs(commentsRef);
-    const replyUpdatePromises = allCommentsSnapshot.docs.map(doc => {
-      const commentData = doc.data();
+    const replyUpdatePromises = allCommentsSnapshot.docs.map(replyDoc => {
+      const commentData = replyDoc.data();
       if (commentData.replies && Array.isArray(commentData.replies)) {
+        let repliesChanged = false;
         const updatedReplies = commentData.replies.map(reply => {
           if (reply.userId === user.uid) {
+            repliesChanged = true;
             return {
               ...reply,
               authorPhotoURL: photoURL,
-              author: displayName
+              author: displayName // Yanıtlardaki author alanı da displayName ile güncellenmeli
             };
           }
           return reply;
         });
-        return updateDoc(doc.ref, { replies: updatedReplies });
+        if (repliesChanged) {
+          return updateDoc(replyDoc.ref, { replies: updatedReplies });
+        }
       }
       return null;
     }).filter(Boolean);
 
     // Tüm güncellemeleri paralel olarak yap
-    await Promise.all([...blogUpdatePromises, ...commentUpdatePromises, ...replyUpdatePromises]);
+    await Promise.all([
+      ...blogUpdatePromises, 
+      ...commentUpdatePromises, 
+      ...replyUpdatePromises
+    ]);
 
-    return user;
+    return user; // Güncellenmiş Auth kullanıcısını döndür
   } catch (error) {
     throw new Error(getFriendlyErrorMessage(error));
   }
