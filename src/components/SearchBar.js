@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, query, where, getDocs, orderBy, limit, startAfter } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase/config';
+import { normalizeTurkishChars } from '../utils/textUtils';
 
 // Debounce fonksiyonu
 function debounce(func, delay) {
@@ -16,21 +17,6 @@ function debounce(func, delay) {
   };
   return debounced;
 }
-
-// Türkçe karakterleri normalize etme fonksiyonu (blogService.js'teki ile aynı olmalı)
-const normalizeTurkishChars = (str) => {
-  if (!str) return '';
-  let s = str;
-  s = s.replace(/İ/g, 'i').replace(/I/g, 'i');
-  s = s.toLowerCase();
-  s = s.replace(/[ıi]/g, 'i');
-  s = s.replace(/ü/g, 'u');
-  s = s.replace(/ö/g, 'o');
-  s = s.replace(/ş/g, 's');
-  s = s.replace(/ç/g, 'c');
-  s = s.replace(/ğ/g, 'g');
-  return s;
-};
 
 const RESULTS_PER_PAGE = 5; // Sayfa başına gösterilecek sonuç sayısı
 

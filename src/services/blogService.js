@@ -14,6 +14,7 @@ import {
   limit as firestoreLimit
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { normalizeTurkishChars } from '../utils/textUtils';
 
 // Yardımcı fonksiyon: Hata mesajlarını özelleştirme
 const getFriendlyErrorMessage = (error) => {
@@ -27,21 +28,6 @@ const getFriendlyErrorMessage = (error) => {
     default:
       return error.message || 'Bir hata oluştu, lütfen tekrar deneyin.';
   }
-};
-
-// Yardımcı fonksiyon: Türkçe karakterleri normalize etme
-const normalizeTurkishChars = (str) => {
-  if (!str) return '';
-  let s = str;
-  s = s.replace(/İ/g, 'i').replace(/I/g, 'i'); // Büyük I ve noktalı İ için
-  s = s.toLowerCase(); // Önce her şeyi küçük harfe çevir
-  s = s.replace(/[ıi]/g, 'i');
-  s = s.replace(/ü/g, 'u');
-  s = s.replace(/ö/g, 'o');
-  s = s.replace(/ş/g, 's');
-  s = s.replace(/ç/g, 'c');
-  s = s.replace(/ğ/g, 'g');
-  return s;
 };
 
 // Yeni blog oluşturma
