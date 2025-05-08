@@ -221,8 +221,8 @@ const SearchBar = () => {
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      // Form gönderildiğinde her zaman ilk aramayı yap (yeni cursorlarla)
-      fetchResults(searchTerm, { isInitial: true });
+      navigate(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+      setShowResults(false);
     }
   };
 

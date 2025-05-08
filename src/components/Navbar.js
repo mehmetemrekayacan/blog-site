@@ -41,21 +41,21 @@ const Navbar = () => {
     <nav className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white shadow-lg sticky top-0 z-50">
       <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex justify-between items-center w-full md:w-auto">
-          {/* Logo */}
-          <Link
-            to="/"
-            className="text-2xl font-bold tracking-tight hover:text-indigo-200 transition-colors duration-200"
-          >
-            BlogSphere
-          </Link>
+        {/* Logo */}
+        <Link
+          to="/"
+          className="text-2xl font-bold tracking-tight hover:text-indigo-200 transition-colors duration-200"
+        >
+          BlogSphere
+        </Link>
 
-          {/* Hamburger Menü (Mobil için) */}
-          <button
-            className="md:hidden text-2xl focus:outline-none"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? "✖" : "☰"}
-          </button>
+        {/* Hamburger Menü (Mobil için) */}
+        <button
+          className="md:hidden text-2xl focus:outline-none"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          {isMenuOpen ? "✖" : "☰"}
+        </button>
         </div>
 
         {/* SearchBar - Doğrudan Navbar içinde */}
