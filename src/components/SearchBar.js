@@ -48,83 +48,39 @@ const SearchBar = () => {
     };
   }, [searchContainerRef]);
 
-  const fetchResults = useCallback(async (termToSearch, options = {}) => {
-    const {
-      isInitial = true,
-      lastBlog = null, 
-      lastUser = null
-    } = options;
-
-    if (!termToSearch.trim()) {
-      setSearchResults([]);
-      setShowResults(false);
-      setIsLoading(false);
-      setIsLoadingMore(false);
-      setHasMoreToFetch(true);
-      setLastVisibleBlogDoc(null); // State'leri sıfırla
-      setLastVisibleUserDoc(null); // State'leri sıfırla
-      return;
-    }
-
-    if (isInitial) {
-      setIsLoading(true);
-      setSearchResults([]);
-      setLastVisibleBlogDoc(null); // İlk aramada state'leri sıfırla
-      setLastVisibleUserDoc(null);
-      setHasMoreToFetch(true); // İlk aramada daha fazla olabileceğini varsay
-    } else {
-      setIsLoadingMore(true);
-    }
-    setError(null);
-    setShowResults(true);
-
-    const normalizedTerm = normalizeTurkishChars(termToSearch);
-
+  const fetchResults = useCallback(async (term, { isInitial = true, lastBlog = null, lastUser = null } = {}) => {
+    if (!term.trim()) return;
+    
     try {
-      let blogsQuery;
-      const blogsCollectionRef = collection(db, 'blogs');
       if (isInitial) {
-        blogsQuery = query(
-          blogsCollectionRef,
-          where('title_normalized', '>=', normalizedTerm),
-          where('title_normalized', '<=', normalizedTerm + '\uf8ff'),
-          orderBy('title_normalized'),
-          limit(RESULTS_PER_PAGE)
-        );
-      } else if (lastBlog) { // Sadece bir önceki cursor varsa devam et
-        blogsQuery = query(
-          blogsCollectionRef,
-          where('title_normalized', '>=', normalizedTerm),
-          where('title_normalized', '<=', normalizedTerm + '\uf8ff'),
-          orderBy('title_normalized'),
-          startAfter(lastBlog),
-          limit(RESULTS_PER_PAGE)
-        );
+        setIsLoading(true);
+        setError(null);
       } else {
-        blogsQuery = null; // Bloglar için daha fazla sorgu yapma
+        setIsLoadingMore(true);
       }
-
-      let usersQuery;
-      const usersCollectionRef = collection(db, 'users');
-      if (isInitial) {
-        usersQuery = query(
-          usersCollectionRef,
-          where('username_normalized', '>=', normalizedTerm), // username_normalized KULLANILIYOR
-          where('username_normalized', '<=', normalizedTerm + '\uf8ff'),
-          orderBy('username_normalized'),
+      
+      const normalizedTerm = normalizeTurkishChars(term.toLowerCase().trim());
+      const searchTerms = normalizedTerm.split(/\s+/).filter(Boolean);
+      
+      let blogsQuery = null;
+      let usersQuery = null;
+      
+      if (searchTerms.length > 0) {
+        blogsQuery = query(
+          collection(db, 'blogs'),
+          where('searchTerms', 'array-contains-any', searchTerms),
+          orderBy('createdAt', 'desc'),
+          startAfter(lastBlog || 0),
           limit(RESULTS_PER_PAGE)
         );
-      } else if (lastUser) { // Sadece bir önceki cursor varsa devam et
+        
         usersQuery = query(
-          usersCollectionRef,
-          where('username_normalized', '>=', normalizedTerm),
-          where('username_normalized', '<=', normalizedTerm + '\uf8ff'),
-          orderBy('username_normalized'),
-          startAfter(lastUser),
+          collection(db, 'users'),
+          where('searchTerms', 'array-contains-any', searchTerms),
+          orderBy('displayName', 'asc'),
+          startAfter(lastUser || 0),
           limit(RESULTS_PER_PAGE)
         );
-      } else {
-        usersQuery = null; // Kullanıcılar için daha fazla sorgu yapma
       }
       
       const promises = [];
@@ -148,10 +104,8 @@ const SearchBar = () => {
       if (blogsSnapshot.docs.length > 0) {
         newLastBlog = blogsSnapshot.docs[blogsSnapshot.docs.length - 1];
       }
-      if (isInitial || newBlogs.length > 0) { // Sadece ilk aramada veya yeni bloglar geldiyse güncelle
-        setLastVisibleBlogDoc(newLastBlog); 
-      } else if (!newBlogs.length && !isInitial) { // Daha fazla yüklenirken blog gelmediyse null yapma, eskisi kalsın
-         // Belki de burada null yapmamak daha iyi, böylece tekrar tekrar aynı şeyi sorgulamaz
+      if (isInitial || newBlogs.length > 0) {
+        setLastVisibleBlogDoc(newLastBlog);
       }
 
       let newLastUser = null;
@@ -160,7 +114,7 @@ const SearchBar = () => {
       }
       if (isInitial || newUsers.length > 0) {
         setLastVisibleUserDoc(newLastUser);
-      } // Benzer mantık kullanıcılar için
+      }
       
       const mightHaveMoreBlogs = newBlogs.length === RESULTS_PER_PAGE;
       const mightHaveMoreUsers = newUsers.length === RESULTS_PER_PAGE;
@@ -173,18 +127,27 @@ const SearchBar = () => {
     } catch (err) {
       console.error("Search error:", err);
       setError('Arama sırasında bir hata oluştu. Lütfen Firebase indekslerinizi kontrol edin veya daha sonra tekrar deneyin.');
-      if (isInitial) setSearchResults([]); // Hata durumunda ilk aramaysa temizle
+      if (isInitial) setSearchResults([]);
       setHasMoreToFetch(false);
     } finally {
       if (isInitial) setIsLoading(false);
       else setIsLoadingMore(false);
     }
-  // useCallback için bağımlılıklar: Sadece state setter'ları ve dışarıdan gelen stabil fonksiyonlar
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]); // navigate dışarıdan geldiği için eklendi, normalizeTurkishChars global olduğu için gerek yok
+  }, [
+    setSearchResults,
+    setError,
+    setIsLoading,
+    setIsLoadingMore,
+    setLastVisibleBlogDoc,
+    setLastVisibleUserDoc,
+    setHasMoreToFetch,
+    navigate
+  ]);
 
-  // Debounced arama fonksiyonu (fetchResults'a olan bağımlılığı değişmediği için stabil kalacak)
-  const debouncedSearch = useCallback(debounce((term) => fetchResults(term, { isInitial: true }), 400), [fetchResults]);
+  const debouncedSearch = useCallback(
+    (term) => fetchResults(term, { isInitial: true }),
+    [fetchResults]
+  );
 
   useEffect(() => {
     if (searchTerm.trim()) {

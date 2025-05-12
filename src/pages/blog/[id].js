@@ -236,6 +236,7 @@ const BlogDetail = () => {
                   src={getEmbedUrl(blog.videoUrl)}
                   className="absolute top-0 left-0 w-full h-full"
                   frameBorder="0"
+                  title={`${blog.title} - Video İçeriği`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 ></iframe>

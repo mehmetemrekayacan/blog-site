@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, setDoc, deleteDoc, getDoc, serverTimestamp, writeBatch, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, writeBatch, increment } from 'firebase/firestore';
 
 // Bir kullanıcıyı takip etme
 export const followUser = async (currentUserId, targetUserId) => {

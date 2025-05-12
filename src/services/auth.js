@@ -105,10 +105,10 @@ export const loginUser = async (email, password) => {
     return user;
   } catch (error) {
     if (error.code === 'auth/user-not-found') {
-      throw { code: 'user-not-found', message: 'Böyle bir hesap bulunamadı.' };
+      throw new Error('Böyle bir hesap bulunamadı.');
     }
     if (error.code === 'auth/wrong-password') {
-      throw { code: 'wrong-password', message: 'Şifreniz yanlış, lütfen şifrenizi doğru girin.' };
+      throw new Error('Şifreniz yanlış, lütfen şifrenizi doğru girin.');
     }
     if (error.code === 'auth/too-many-requests') {
       throw new Error('Çok fazla başarısız giriş denemesi. Lütfen bir süre bekleyin.');

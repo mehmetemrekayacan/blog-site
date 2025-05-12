@@ -11,10 +11,10 @@ import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Lazy loading ile sayfa bileşenlerini dinamik olarak yükleme
-const Home = lazy(() => import("./pages"));
-const Login = lazy(() => import("./pages/login"));
-const Register = lazy(() => import("./pages/register"));
-const Profile = lazy(() => import("./pages/profile"));
+const Home = lazy(() => import("./pages/index"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const Profile = lazy(() => import("./pages/Profile"));
 const UserProfile = lazy(() => import("./pages/UserProfile"));
 const SearchResultsPage = lazy(() => import("./pages/SearchResultsPage"));
 const Share = lazy(() => import("./pages/share"));
@@ -22,7 +22,7 @@ const Edit = lazy(() => import("./pages/edit"));
 const BlogDetail = lazy(() => import("./pages/blog/[id]"));
 const AdminPanel = lazy(() => import("./pages/Admin"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
-const Settings = lazy(() => import('./pages/settings'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 function App() {
   return (

@@ -205,6 +205,7 @@ const BlogCard = ({ id, title, content, author, date, imageUrl, videoUrl, tags =
               src={getEmbedUrl(videoUrl)}
               className="absolute top-0 left-0 w-full h-full"
               frameBorder="0"
+              title={`${title} - Video İçeriği`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             ></iframe>
