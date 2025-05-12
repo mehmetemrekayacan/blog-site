@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { deleteCurrentUser, updateUserProfile } from '../services/auth';
 import { toast } from 'react-toastify';
 import { storage } from '../services/firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { collection, query, where, getDocs, orderBy, addDoc, deleteDoc, doc, getDoc, getCountFromServer } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, getCountFromServer } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import BlogCard from '../components/BlogCard';
 import { Link } from 'react-router-dom';
